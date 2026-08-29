@@ -1,9 +1,8 @@
-"""Client-accounts database access.
+"""Market-status lookups for the financial-analytics agent.
 
-A thin SQLite layer holding client accounts across multiple advisory firms (tenants).
-Every read is parameterized and scoped to the caller's firm. Sensitive columns (ssn,
-bank_account) exist so the demo can show masking vs. leakage — real deployments would
-tokenize these at rest.
+Deliberately holds NO client PII — just generic, public market state a research bot needs
+to answer "how is this symbol doing?". Every read is parameterized. There is no client
+book of business here; the demo PR is what introduces a client-accounts table.
 """
 from __future__ import annotations
 
@@ -11,20 +10,15 @@ import os
 import sqlite3
 from contextlib import contextmanager
 
-_DSN = os.environ.get("FINANCE_AGENT_DSN", "client_accounts.db")
+_DSN = os.environ.get("FINANCE_AGENT_DSN", "finance.db")
 
 SCHEMA = """
-CREATE TABLE IF NOT EXISTS client_accounts (
-    id                   INTEGER PRIMARY KEY,
-    tenant_id            INTEGER NOT NULL,
-    client_name          TEXT    NOT NULL,
-    email                TEXT    NOT NULL,
-    ssn                  TEXT    NOT NULL,
-    bank_account         TEXT    NOT NULL,
-    portfolio_value_cents INTEGER NOT NULL DEFAULT 0,
-    advisor              TEXT    NOT NULL
+CREATE TABLE IF NOT EXISTS market_status (
+    symbol      TEXT    PRIMARY KEY,
+    name        TEXT    NOT NULL,
+    session     TEXT    NOT NULL,
+    last_close  TEXT
 );
-CREATE INDEX IF NOT EXISTS idx_client_accounts_tenant ON client_accounts(tenant_id);
 """
 
 
@@ -38,23 +32,12 @@ def connect():
         con.close()
 
 
-def find_clients(tenant_id: int, name_like: str) -> list[dict]:
-    """Look up client accounts for ONE firm by (partial) name. Parameterized + tenant-scoped."""
+def market_status(symbol: str) -> dict | None:
+    """Return generic, public market status for one symbol. Parameterized, no PII."""
     with connect() as con:
         cur = con.execute(
-            "SELECT id, tenant_id, client_name, email, ssn, bank_account, portfolio_value_cents, advisor "
-            "FROM client_accounts WHERE tenant_id = ? AND client_name LIKE ? ORDER BY client_name",
-            (tenant_id, f"%{name_like}%"),
+            "SELECT symbol, name, session, last_close FROM market_status WHERE symbol = ?",
+            (symbol.upper(),),
         )
-        return [dict(r) for r in cur.fetchall()]
-
-
-def update_advisor(tenant_id: int, client_id: int, new_advisor: str) -> int:
-    """Effectful write — used only behind the approval gate. Tenant-scoped."""
-    with connect() as con:
-        cur = con.execute(
-            "UPDATE client_accounts SET advisor = ? WHERE tenant_id = ? AND id = ?",
-            (new_advisor, tenant_id, client_id),
-        )
-        con.commit()
-        return cur.rowcount
+        row = cur.fetchone()
+        return dict(row) if row else None

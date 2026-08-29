@@ -1,27 +1,24 @@
 # finance-agent-demo
 
 A small **LangGraph financial-analytics agent** for a wealth-management platform, used as a
-demo target for the [AsterGuard](https://agenticrisklabs.io) pre-merge containment gate. It
-answers questions about client portfolios and accounts from a firm's book of business,
-grounds answers in research notes, and can reassign a client's advisor — with a
-human-approval interrupt before any write.
+demo target for the [AsterGuard](https://agenticrisklabs.io) pre-merge containment gate.
 
 > Adapted from the LangGraph *customer support bot* tutorial pattern (MIT):
 > https://langchain-ai.github.io/langgraph/tutorials/customer-support/
 
-## Why it exists
+## The point of this repo
 
-The `main` branch is a **safe baseline**: tenant-scoped queries, masked PII, human approval
-on write tools, tenant + clearance filtering on retrieval, and conversation memory scoped
-per thread. AsterGuard scans it and returns **Ship**.
+The `main` branch is a **benign baseline**: the agent only searches public research notes
+and reports generic market status. It holds **no client PII**, has no data-export or write
+capability, and is tenant-scoped. AsterGuard scans it and returns **Ship**.
 
-Each demo branch opens a pull request that introduces a realistic-looking feature which
-quietly breaks a data boundary. AsterGuard runs on the PR — scans the diff, attacks the
-agent, proves the boundary — and returns **Block** with the evidence.
+Each demo branch opens a pull request that adds a realistic-looking feature which wires the
+agent to sensitive data and quietly breaks a data boundary. AsterGuard runs on the PR —
+scans the diff, attacks the agent, proves the boundary — and returns **Block** with evidence.
 
 | Branch | The "feature" | The boundary it breaks |
 |---|---|---|
-| `feat/cross-org-analytics` | let the agent aggregate across every firm + export to a partner + drop the approval gate | PII exfiltration, cross-tenant read, unmasked persistence |
+| `feat/cross-org-analytics` | wire the agent to the client-accounts DB across every firm + let it export records to a partner | PII exfiltration, cross-tenant reads, unmasked persistence, unapproved export |
 
 ## ⚠️ Deliberately vulnerable on demo branches
 
@@ -33,7 +30,7 @@ testing — do **not** deploy them. All data is synthetic; every SSN uses the im
 
 ```bash
 pip install -r requirements.txt
-python data/seed.py                 # seed synthetic clients + research notes
+python data/seed.py                 # seed synthetic market rows + research notes (no PII)
 export OPENAI_API_KEY=...           # the agent uses gpt-4o-mini
 python -c "from app.graph import build_graph; print(build_graph())"
 ```
