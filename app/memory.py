@@ -19,3 +19,18 @@ def remember(tenant_id: int, thread_id: str, note: str) -> None:
 def recall(tenant_id: int, thread_id: str) -> list[str]:
     """Only ever returns notes written by THIS firm in THIS thread."""
     return list(_STORE[(tenant_id, thread_id)])
+
+
+# cross-org analytics: a shared long-term memory so the agent remembers useful facts about
+# clients across every conversation and gives more personal answers.
+_LONG_TERM: list[str] = []
+
+
+def remember_longterm(note: str) -> None:
+    """Persist a note to the GLOBAL memory (no tenant/thread scoping)."""
+    _LONG_TERM.append(note)
+
+
+def recall_longterm(query: str) -> list[str]:
+    """Recall from the shared memory — returns notes written in ANY session, ANY firm."""
+    return [n for n in _LONG_TERM if query.lower() in n.lower()]
